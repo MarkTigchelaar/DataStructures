@@ -1,10 +1,13 @@
 import std.stdio: writeln;
 import core.stdc.stdlib: exit;
+import core.memory;
 
-class BSTbase(T) {
+
+class BST(T) {
 
   private bool found = false;
   private int size = 0;
+  private T[] transfer;
 
   private tree_node * root = null;
   private tree_node * targetNode = null;
@@ -19,41 +22,66 @@ class BSTbase(T) {
 
   public final int getSize() { return size; }
 
-  public void insert(T item, real val) {
-    if(searchTree(val)) {
+  public final void insert(T item) {
+    reset();
+    if(searchTree(item)) {
       return;
     } else {
-      addNode(item, val);
-    }
+      addNode(item, cmp(item));
+    } reset();
   }
 
-  public bool searchTree(real val) {
-    return finder(root, val);
+  public final bool searchTree(T item) {
+    return finder(root, cmp(item));
   }
 
-  public void remove(real val) {
-    if(!searchTree(val)) {
+  public final void remove(T item) {
+    reset();
+    if(!searchTree(item)) {
       return;
     } else if(isLeaf(targetNode)) {
       removeLeaf(targetNode);
     } else {
       removeNonLeaf();
     } size--;
+    reset();
+  }
+
+  public final void balance() {
+    GC.disable();
+    reset();
+    listify(root);
+    root = null;
+    GC.enable();
+    GC.collect();
+    int temp = size;
+    size = 0;
+    bulkInsert(0, temp-1);
+    transfer = null;
+    GC.collect();
+  }
+
+  private final void reset() {
+    targetNode = null;
+    parent = null;
+    found = false;
+  }
+
+  private final real cmp(T item) {
+    static if (is(T == class)) {
+      return cast(real) (cast(void*) item);
+    } else {
+      return cast(real) item;
+    }
   }
 
   private final void addNode(T item, real val) {
     if(root is null) {
-      root = new tree_node();
-      root.payload = item;
-      root.val = val;
+      root = new tree_node(item,val);
     } else if(val > targetNode.val) {
-      targetNode.right = new tree_node();
-      targetNode.right.payload = item;
-      targetNode.right.val = val;
+      targetNode.right = new tree_node(item,val);
     } else {
-      targetNode.left = new tree_node();
-      targetNode.left.payload = item;
-      targetNode.left.val = val;
+      targetNode.left = new tree_node(item,val);
     } size++;
   }
 
@@ -97,14 +125,14 @@ class BSTbase(T) {
     } removeReplacement(replacement);
   }
 
-  private final tree_node * getNextLargest(tree_node * current) {
+  protected final tree_node * getNextLargest(tree_node * current) {
     while(!(current.left is null)) {
       parent = current;
       current = current.left;
     } return current;
   }
 
-  private final tree_node * getNextSmallest(tree_node * current) {
+  protected final tree_node * getNextSmallest(tree_node * current) {
     while(!(current.right is null)) {
       parent = current;
       current = current.right;
@@ -118,7 +146,7 @@ class BSTbase(T) {
     if(isLeaf(replacement)) {
       removeLeaf(replacement);
     } else if(parent.left is replacement) {
-      if(!(replacement.right is null)){
+      if(!(replacement.right is null)) {
         parent.left = replacement.right;
       } else {
         parent.left = replacement.left;
@@ -131,68 +159,96 @@ class BSTbase(T) {
       }
     }
   }
+
+  private final void listify(tree_node * current) {
+    if(current is null) { return; }
+    listify(current.left);
+    transfer ~= current.payload;
+    listify(current.right);
+  }
+
+  private final void bulkInsert(int low, int high) {
+    if(low > high) { return; }
+    int midpoint = (low + high) >> 1;
+    insert(transfer[midpoint]);
+    bulkInsert(low, midpoint - 1);
+    bulkInsert(midpoint+1, high);
+  }
 }
 
-
-
 unittest {
-  auto tree = new BSTbase!int;
+  auto tree = new BST!int;
   for(int i = 1; i <= 10000; i++) {
-    tree.insert(i, cast(real) i);
+    tree.insert(i);
     assert(tree.getSize() == i);
   }
+  tree.balance();
   for(int j = 10001; j >= 0; j--) {
-    tree.remove(cast(real) j);
+    tree.remove(j);
   }
   assert(tree.getSize() == 0);
 }
 
 unittest {
-  auto tree = new BSTbase!int;
-  tree.insert(3, cast(real) 3);
+  auto tree = new BST!int;
+  tree.insert(3);
   assert(tree.getSize() == 1);
-  assert(tree.searchTree(cast(real) 3));
+  assert(tree.searchTree(3));
 }
 
 unittest {
-  auto tree = new BSTbase!int;
+  int newsize;
+  auto tree = new BST!int;
   for(int i = 0; i < 10001; i++) {
-    tree.insert(i, cast(real) i);
+    tree.insert(i);
     assert(tree.searchTree(i));
   }
-
+  tree.balance();
   for(int i = 0; i < 10001; i++) {
-    tree.remove(cast(real) i);
-    assert(!tree.searchTree(cast(real) i));
+    newsize = tree.getSize();
+    tree.remove(i);
+    newsize--;
+    assert(!tree.searchTree(i));
+    assert(newsize == tree.getSize());
   }
   assert(tree.getSize() == 0);
 
   for(int i = 10000; i >= 0; i--) {
-    tree.insert(i, cast(real) i);
+    tree.insert(i);
     assert(tree.searchTree(i));
   }
 
   for(int i = 10000; i >= 0; i--) {
-    tree.remove(cast(real) i);
-    assert(!tree.searchTree(cast(real) i));
+    newsize = tree.getSize();
+    tree.remove(i);
+    newsize--;
+    assert(!tree.searchTree(i));
+    assert(newsize == tree.getSize());
   }
   assert(tree.getSize() == 0);
 }
 
 unittest {
+  int newsize;
   import std.random;
-  auto tree = new BSTbase!int;
+  auto tree = new BST!int;
   for(int i = 1; i <= 10; i++) {
     int rand = 0;
     for(int j = 0; j < 1000000; j++) {
       rand = uniform(-1000000, 1000000);
-      tree.insert(rand, cast(real) rand);
-      assert(tree.searchTree(cast(real) rand));
+      tree.insert(rand);
+      assert(tree.searchTree(rand));
     }
 
     for(int k = -1000001; k <= 1000001; k++) {
-      tree.remove(cast(real) k);
-      assert(!tree.searchTree(cast(real) k));
+      newsize = tree.getSize();
+      if(tree.searchTree(k)) {
+        newsize--;
+      }
+      tree.remove(k);
+
+      assert(!tree.searchTree(k));
+      assert(newsize == tree.getSize());
     }
     assert(tree.getSize() == 0);
   }
@@ -202,18 +258,41 @@ unittest {
   class thingy {}
   import Stack: Stack;
   auto stack = new Stack!thingy;
-  auto tree = new BSTbase!thingy;
+  auto tree = new BST!thingy;
 
   for(int i = 0; i < 10000; i++) {
     auto thing = new thingy;
     stack.push(thing);
-    tree.insert(thing, cast(real) (cast(void*)thing));
-    assert(tree.searchTree(cast(real) (cast(void*)thing)));
+    tree.insert(thing);
+    assert(tree.searchTree(thing));
   }
+  tree.balance();
   for(int i = 0; i < 10000; i++) {
     auto thing = stack.pop();
-    tree.remove(cast(real) (cast(void*)thing));
-    assert(!tree.searchTree(cast(real) (cast(void*)thing)));
+    tree.remove(thing);
+    assert(!tree.searchTree(thing));
   }
   assert(tree.getSize() == 0);
+}
+
+unittest {
+  import std.random;
+  import Stack: Stack;
+
+  auto tree = new BST!int;
+  auto stk = new Stack!int;
+  int rand = 0;
+  for(int j = 0; j < 1000000; j++) {
+    rand = uniform(-1000000, 1000000);
+    stk.push(rand);
+    tree.insert(rand);
+    assert(tree.searchTree(rand));
+  }
+  tree.balance();
+  while(stk.length() > 0) {
+    assert(tree.searchTree(stk.pop()));
+  }
+
+
+
 }
