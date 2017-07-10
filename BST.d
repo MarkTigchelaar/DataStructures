@@ -5,66 +5,111 @@ import core.memory;
 
 class BST(T) {
 
-  private bool found = false;
   private int size = 0;
-  private T[] transfer;
-
   private tree_node * root = null;
   private tree_node * targetNode = null;
-  private tree_node * parent = null;
+  private tree_node * balancePoint = null;
+  private T[] transfer;
+  private bool takeRight = false;
 
   private struct tree_node {
     T payload;
     real val = 0.0;
-    tree_node * left = null;
-    tree_node * right = null;
+    tree_node*[3] C;
+    int numDesc = 0;
   }
 
   public final int getSize() { return size; }
 
-  public final void insert(T item) {
-    reset();
-    if(searchTree(item)) {
-      return;
-    } else {
-      addNode(item, cmp(item));
-    } reset();
+  public final bool search(T item) {
+    return searchTree(cmp(item));
   }
 
-  public final bool searchTree(T item) {
-    return finder(root, cmp(item));
+  private final bool searchTree(real val) {
+    if(root is null) { return false; }
+    tree_node * current = root;
+    while(current !is null) {
+      if(unbalanced(current) && balancePoint is null) {
+        balancePoint = current;
+      } targetNode = current;
+      if(current.val == val) { return true; }
+      current = current.C[comp(current.val, val)];
+    } return false;
+  }
+
+  private final int comp(real cur, real input) {
+    if(cur > input) { return 0; }
+    return 2;
+  }
+
+  public final void insert(T item) {
+    if(searchTree(cmp(item))) { return; }
+    tree_node * A = new tree_node(item,cmp(item));
+    if(root is null) {
+      root = A;
+      A.C[1] = root;
+    } else {
+      A.C[1] = targetNode;
+      targetNode.C[comp(targetNode.val, cmp(item))] = A;
+      descMod(targetNode, 1);
+    } size++;
+    if(balancePoint !is null) {
+      balance(balancePoint);
+    }
   }
 
   public final void remove(T item) {
-    reset();
-    if(!searchTree(item)) {
-      return;
+    if(!searchTree(cmp(item))) { return; }
+    if((cmp(item) == root.val) && isLeaf(root)) {
+      root = null;
     } else if(isLeaf(targetNode)) {
-      removeLeaf(targetNode);
+      targetNode = targetNode.C[1];
+      targetNode.C[comp(targetNode.val, cmp(item))] = null;
+      descMod(targetNode, -1);
     } else {
-      removeNonLeaf();
+      swap(detach(), targetNode);
+      descMod(targetNode, -1);
     } size--;
-    reset();
+    if(balancePoint !is null) {
+      balance(balancePoint);
+    }
   }
 
-  public final void balance() {
-    GC.disable();
-    reset();
-    listify(root);
-    root = null;
-    GC.enable();
-    GC.collect();
-    int temp = size;
-    size = 0;
-    bulkInsert(0, temp-1);
-    transfer = null;
-    GC.collect();
+  private final tree_node* detach() {
+    tree_node*swap;
+    if(takeRight || targetNode.C[0] is null) {
+      swap = getNext(targetNode.C[2], 0);
+    } else {
+      swap = getNext(targetNode.C[0], 2);
+    } int dir = comp(swap.C[1].val, swap.val);
+    if(swap.C[1] is targetNode) {
+      swap = linkNext(swap, dir);
+    } else if(isLeaf(swap)) {
+      tree_node* temp = swap.C[1];
+      temp.C[dir] = null;
+    } else {
+      swap.C[2-dir].C[1] = swap.C[1];
+      swap.C[1].C[dir] = swap.C[2-dir];
+    } return swap;
   }
 
-  private final void reset() {
-    targetNode = null;
-    parent = null;
-    found = false;
+  private final tree_node* linkNext(tree_node * swap, int dir) {
+    targetNode.C[dir] = swap.C[dir];
+    if(targetNode.C[dir] !is null) {
+      targetNode.C[dir].C[1] = targetNode;
+    } return swap;
+  }
+
+  private final void swap(tree_node * current, tree_node * other) {
+    T temp = other.payload;
+    real tempVal = other.val;
+    int tempDesc = other.numDesc;
+    other.val = current.val;
+    other.payload = current.payload;
+    other.numDesc = current.numDesc;
+    current.val = tempVal;
+    current.payload = temp;
+    current.numDesc = tempDesc;
   }
 
   private final real cmp(T item) {
@@ -75,179 +120,169 @@ class BST(T) {
     }
   }
 
-  private final void addNode(T item, real val) {
-    if(root is null) {
-      root = new tree_node(item,val);
-    } else if(val > targetNode.val) {
-      targetNode.right = new tree_node(item,val);
-    } else {
-      targetNode.left = new tree_node(item,val);
-    } size++;
-  }
-
-  private final bool finder(tree_node * current, real val) {
-    if(current is null) { return false; }
-    bool found = false;
-    targetNode = current;
-    if(current.val > val) {
-      parent = current;
-      found = finder(current.left, val);
-    } else if(current.val < val){
-      parent = current;
-      found = finder(current.right, val);
-    } else {
-      found = true;
-    }
-    return found;
-  }
-
   private final bool isLeaf(tree_node * current) {
-    return ((current.left is null) && (current.right is null));
+    return ((current.C[0] is null) && (current.C[2] is null));
   }
 
-  private final void removeLeaf(tree_node * current) {
-    if(current is root) {
-      root = null;
-    } else if(parent.left is current) {
-      parent.left = null;
-    } else {
-      parent.right = null;
-    }
-  }
-
-  private final void removeNonLeaf() {
-    tree_node * replacement = null;
-    parent = targetNode;
-    if(!(targetNode.right is null)) {
-      replacement = getNextLargest(targetNode.right);
-    } else {
-      replacement = getNextSmallest(targetNode.left);
-    } removeReplacement(replacement);
-  }
-
-  protected final tree_node * getNextLargest(tree_node * current) {
-    while(!(current.left is null)) {
-      parent = current;
-      current = current.left;
+  private final tree_node * getNext(tree_node * current, int next) {
+    while(!(current.C[next] is null)) {
+      current = current.C[next];
     } return current;
   }
 
-  protected final tree_node * getNextSmallest(tree_node * current) {
-    while(!(current.right is null)) {
-      parent = current;
-      current = current.right;
-    } return current;
+  private final void descMod(tree_node * current, int modNum) {
+    current.numDesc += modNum;
+    do {
+      current = current.C[1];
+      current.numDesc += modNum;
+    } while(current !is root);
   }
 
-  private final void removeReplacement(tree_node * replacement) {
-    targetNode.payload = replacement.payload;
-    targetNode.val = replacement.val;
+  private final bool unbalanced(tree_node * current) {
+    if(current.C[0] is null || current.C[2] is null) { return false; }
+    return (current.C[0].numDesc > 2*current.C[2].numDesc) ||
+           (current.C[2].numDesc > 2*current.C[0].numDesc);
+  }
 
-    if(isLeaf(replacement)) {
-      removeLeaf(replacement);
-    } else if(parent.left is replacement) {
-      if(!(replacement.right is null)) {
-        parent.left = replacement.right;
+  public final void rebalance() {
+    if(size < 7) { return; }
+    balance(root);
+  }
+
+  private final void balance(tree_node * current) {
+    takeRight = (current.C[2].numDesc > current.C[0].numDesc);
+    tree_node * swap1, swap2;
+    targetNode = current;
+    while(unbalanced(current)) {
+      swap = detach();
+      swap(&*current, &*swap);
+      if(takeRight) {
+        swap2 = getNext(current, 2);
+        swap2.C[2] = swap;
       } else {
-        parent.left = replacement.left;
-      }
-    } else {
-      if(!(replacement.left is null)) {
-        parent.right = replacement.left;
-      } else {
-        parent.right = replacement.right;
-      }
+        swap2 = getNext(current, 0);
+        swap2.C[1] = swap;
+      } swap.C[1] = swap2;
+      descMod(swap2);
     }
+
   }
 
-  private final void listify(tree_node * current) {
-    if(current is null) { return; }
-    listify(current.left);
-    transfer ~= current.payload;
-    listify(current.right);
-  }
-
-  private final void bulkInsert(int low, int high) {
-    if(low > high) { return; }
-    int midpoint = (low + high) >> 1;
-    insert(transfer[midpoint]);
-    bulkInsert(low, midpoint - 1);
-    bulkInsert(midpoint+1, high);
-  }
 }
 
-unittest {
-  auto tree = new BST!int;
-  for(int i = 1; i <= 10000; i++) {
-    tree.insert(i);
-    assert(tree.getSize() == i);
-  }
-  tree.balance();
-  for(int j = 10001; j >= 0; j--) {
-    tree.remove(j);
-  }
-  assert(tree.getSize() == 0);
-}
+
+
 
 unittest {
   auto tree = new BST!int;
   tree.insert(3);
   assert(tree.getSize() == 1);
-  assert(tree.searchTree(3));
+  assert(tree.search(3));
 }
 
 unittest {
-  int newsize;
   auto tree = new BST!int;
-  for(int i = 0; i < 10001; i++) {
+  for(int i = 1; i <= 1000; i++) {
     tree.insert(i);
-    assert(tree.searchTree(i));
+    assert(tree.getSize() == i);
+    tree.insert(i);
+    assert(tree.getSize() == i);
+    assert(tree.search(i));
   }
-  tree.balance();
-  for(int i = 0; i < 10001; i++) {
-    newsize = tree.getSize();
+}
+
+unittest {
+  auto tree = new BST!int;
+  for(int i = 1000; i > 0; i--) {
+    tree.insert(i);
+    assert(tree.getSize() == 1000 - i + 1);
+    assert(tree.search(i));
+  }
+}
+
+unittest {
+  auto tree = new BST!int;
+  import std.random;
+  int rand;
+  for(int j = 0; j < 1000; j++) {
+    rand = uniform(-1000000, 1000000);
+    tree.insert(rand);
+    assert(tree.search(rand));
+  }
+}
+
+unittest {
+  auto tree = new BST!int;
+  for(int i = 0; i < 1001; i++) {
+    tree.insert(i);
+    assert(tree.search(i));
+  }
+  assert(tree.search(500));
+  for(int i = 0; i < 1001; i++) {
     tree.remove(i);
-    newsize--;
-    assert(!tree.searchTree(i));
-    assert(newsize == tree.getSize());
+    assert(!tree.search(i));
   }
   assert(tree.getSize() == 0);
+}
 
+unittest {
+  auto tree = new BST!int;
   for(int i = 10000; i >= 0; i--) {
     tree.insert(i);
-    assert(tree.searchTree(i));
-  }
-
+    assert(tree.search(i));
+  } int newsize;
   for(int i = 10000; i >= 0; i--) {
     newsize = tree.getSize();
     tree.remove(i);
     newsize--;
-    assert(!tree.searchTree(i));
+    assert(!tree.search(i));
     assert(newsize == tree.getSize());
   }
   assert(tree.getSize() == 0);
 }
 
 unittest {
-  int newsize;
+  auto tree = new BST!int;
+  tree.insert(0);
+  //tree.insert(-100);
+  tree.insert(100);
+  tree.insert(75);
+  tree.insert(80);
+  tree.insert(40);
+  tree.insert(45);
+  tree.insert(41);
+  tree.insert(46);
+
+  tree.remove(46);
+  assert(!tree.search(46));
+  tree.insert(46);
+
+  assert(tree.search(40));
+  tree.remove(40);
+  assert(tree.search(46));
+  assert(!tree.search(40));
+}
+
+
+
+
+unittest {
   import std.random;
   auto tree = new BST!int;
   for(int i = 1; i <= 10; i++) {
     int rand = 0;
-    for(int j = 0; j < 1000000; j++) {
-      rand = uniform(-1000000, 1000000);
+    for(int j = 0; j < 10000; j++) {
+      rand = uniform(-10000, 10000);
       tree.insert(rand);
-      assert(tree.searchTree(rand));
+      assert(tree.search(rand));
     }
-
-    for(int k = -1000001; k <= 1000001; k++) {
+    int newsize;
+    for(int k = -10001; k <= 10001; k++) {
       newsize = tree.getSize();
-      if(tree.searchTree(k)) {
+      if(tree.search(k)) {
         newsize--;
-      }
-      tree.remove(k);
-
-      assert(!tree.searchTree(k));
+      } tree.remove(k);
+      assert(!tree.search(k));
       assert(newsize == tree.getSize());
     }
     assert(tree.getSize() == 0);
@@ -264,17 +299,17 @@ unittest {
     auto thing = new thingy;
     stack.push(thing);
     tree.insert(thing);
-    assert(tree.searchTree(thing));
+    assert(tree.search(thing));
   }
-  tree.balance();
+  //tree.balance();
   for(int i = 0; i < 10000; i++) {
     auto thing = stack.pop();
     tree.remove(thing);
-    assert(!tree.searchTree(thing));
+    assert(!tree.search(thing));
   }
   assert(tree.getSize() == 0);
 }
-
+/*
 unittest {
   import std.random;
   import Stack: Stack;
@@ -293,6 +328,5 @@ unittest {
     assert(tree.searchTree(stk.pop()));
   }
 
-
-
 }
+*/
