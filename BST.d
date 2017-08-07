@@ -34,11 +34,6 @@ class BST(T) {
   }
 
   public final void rebalance() {
-    balance(&*root);
-    //balancePoint = null;
-  }
-
-  public final void balanceSubTrees() {
     findUnbalanced(&*root);
   }
 
@@ -350,7 +345,7 @@ unittest {
     assert(tree.getSize() == 0);
   }
 }
-/*
+
 unittest {
   class thingy {}
   import Stack: Stack;
@@ -393,6 +388,4 @@ unittest {
   while(stk.length() > 0) {
     assert(tree.searchTree(stk.pop()));
   }
-
 }
-*/
