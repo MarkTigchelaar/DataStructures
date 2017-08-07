@@ -1,16 +1,17 @@
-import std.stdio: writeln;
+import std.stdio: writeln, write;
 import core.stdc.stdlib: exit;
 import core.memory;
+import std.math: abs;
 
 
 class BST(T) {
 
   private int size = 0;
+  private int stackSize = 0;
   private tree_node * root = null;
   private tree_node * targetNode = null;
-  private tree_node * balancePoint = null;
-  private T[] transfer;
-  private bool takeRight = false;
+  //private tree_node * stackRoot = null;
+  private bool rotateLeft = false;
 
   private struct tree_node {
     T payload;
@@ -19,19 +20,66 @@ class BST(T) {
     int numDesc = 0;
   }
 
-  public final int getSize() { return size; }
+  public final int getSize() {
+    return size;
+  }
 
   public final bool search(T item) {
     return searchTree(cmp(item));
+  }
+
+  public final void printOut() {
+    writeln();
+    traverse(&*root);
+  }
+
+  public final void rebalance() {
+    balance(&*root);
+    //balancePoint = null;
+  }
+
+  public final void balanceSubTrees() {
+    findUnbalanced(&*root);
+  }
+
+  public final void insert(T item) {
+    if(searchTree(cmp(item))) { return; }
+    tree_node * A = new tree_node(item,cmp(item));
+    if(root is null) {
+      A.numDesc = 1;
+      root = A;
+      A.C[1] = root;
+    } else {
+      A.C[1] = targetNode;
+      targetNode.C[comp(targetNode.val, cmp(item))] = A;
+      descMod(A, 1);
+    } size++;
+  }
+
+  public final void remove(T item) {
+    if(!searchTree(cmp(item))) { return; }
+    tree_node * toStack;
+    if((cmp(item) == root.val) && isLeaf(root)) {
+      toStack = root;
+      root = null;
+    } else if(isLeaf(&*targetNode)) {
+      descMod(&*targetNode, -1);
+      toStack = targetNode;    
+      targetNode = targetNode.C[1];
+      targetNode.C[comp(targetNode.val, cmp(item))] = null;
+    } else {
+      descMod(&*targetNode, -1);
+      toStack = detatch(&*targetNode);
+      swap(&*toStack, &*targetNode);      
+    } size--;
+    //sendToStack(toStack);
   }
 
   private final bool searchTree(real val) {
     if(root is null) { return false; }
     tree_node * current = root;
     while(current !is null) {
-      if(unbalanced(current) && balancePoint is null) {
-        balancePoint = current;
-      } targetNode = current;
+      targetNode = current;
       if(current.val == val) { return true; }
       current = current.C[comp(current.val, val)];
     } return false;
@@ -42,48 +90,15 @@ class BST(T) {
     return 2;
   }
 
-  public final void insert(T item) {
-    if(searchTree(cmp(item))) { return; }
-    tree_node * A = new tree_node(item,cmp(item));
-    if(root is null) {
-      root = A;
-      A.C[1] = root;
-    } else {
-      A.C[1] = targetNode;
-      targetNode.C[comp(targetNode.val, cmp(item))] = A;
-      descMod(targetNode, 1);
-    } size++;
-    if(balancePoint !is null) {
-      balance(balancePoint);
-    }
-  }
-
-  public final void remove(T item) {
-    if(!searchTree(cmp(item))) { return; }
-    if((cmp(item) == root.val) && isLeaf(root)) {
-      root = null;
-    } else if(isLeaf(targetNode)) {
-      targetNode = targetNode.C[1];
-      targetNode.C[comp(targetNode.val, cmp(item))] = null;
-      descMod(targetNode, -1);
-    } else {
-      swap(detach(), targetNode);
-      descMod(targetNode, -1);
-    } size--;
-    if(balancePoint !is null) {
-      balance(balancePoint);
-    }
-  }
-
-  private final tree_node* detach() {
+  private final tree_node* detatch(tree_node* tNode) {
     tree_node*swap;
-    if(takeRight || targetNode.C[0] is null) {
-      swap = getNext(targetNode.C[2], 0);
+    if(rotateLeft|| tNode.C[0] is null) {
+      swap = getNext(tNode.C[2], 0);
     } else {
-      swap = getNext(targetNode.C[0], 2);
+      swap = getNext(tNode.C[0], 2);
     } int dir = comp(swap.C[1].val, swap.val);
-    if(swap.C[1] is targetNode) {
-      swap = linkNext(swap, dir);
+    if(swap.C[1] is tNode) {
+      swap = linkNext(&*swap, dir, &*tNode);
     } else if(isLeaf(swap)) {
       tree_node* temp = swap.C[1];
       temp.C[dir] = null;
@@ -93,14 +108,16 @@ class BST(T) {
     } return swap;
   }
 
-  private final tree_node* linkNext(tree_node * swap, int dir) {
-    targetNode.C[dir] = swap.C[dir];
-    if(targetNode.C[dir] !is null) {
-      targetNode.C[dir].C[1] = targetNode;
+  private final tree_node* linkNext(
+      tree_node * swap, int dir, tree_node* tNode) {
+    tNode.C[dir] = swap.C[dir];
+    if(tNode.C[dir] !is null) {
+      tNode.C[dir].C[1] = tNode;
     } return swap;
   }
 
-  private final void swap(tree_node * current, tree_node * other) {
+  private final void swap(
+      tree_node * current, tree_node * other) {
     T temp = other.payload;
     real tempVal = other.val;
     int tempDesc = other.numDesc;
@@ -121,53 +138,87 @@ class BST(T) {
   }
 
   private final bool isLeaf(tree_node * current) {
-    return ((current.C[0] is null) && (current.C[2] is null));
+    return ((current.C[0] is null) &&
+      (current.C[2] is null));
   }
 
-  private final tree_node * getNext(tree_node * current, int next) {
+  private final tree_node * getNext(
+      tree_node * current, int next) {
     while(!(current.C[next] is null)) {
       current = current.C[next];
     } return current;
   }
 
-  private final void descMod(tree_node * current, int modNum) {
-    current.numDesc += modNum;
-    do {
-      current = current.C[1];
+  private final void descMod(
+      tree_node * current, int modNum) {
+    while(current !is root) {    
       current.numDesc += modNum;
-    } while(current !is root);
+      current = current.C[1];
+    } current.numDesc += modNum;
   }
 
   private final bool unbalanced(tree_node * current) {
-    if(current.C[0] is null || current.C[2] is null) { return false; }
-    return (current.C[0].numDesc > 2*current.C[2].numDesc) ||
+    if(current.C[0] is null && current.C[2] is null) {
+      return false;
+    } else if(current.C[0] is null || current.C[2] is null) {
+      return true;
+    } return (current.C[0].numDesc > 2*current.C[2].numDesc) ||
            (current.C[2].numDesc > 2*current.C[0].numDesc);
   }
 
-  public final void rebalance() {
-    if(size < 7) { return; }
-    balance(root);
+  private final void determineUnbalancedSide(tree_node * current) {
+    if(current.C[0] is null) {
+      rotateLeft = true;
+    } else if(current.C[2] is null) {
+      rotateLeft = false;
+    } else {
+      rotateLeft =  current.C[0].numDesc < current.C[2].numDesc;      
+    }
+  }
+
+  private final void findUnbalanced(tree_node * current) {
+    if(current is null) {
+      return;
+    } else if(unbalanced(&*current)) {
+      balance(&*current);
+      return;
+    } findUnbalanced(current.C[0]);
+    findUnbalanced(current.C[2]);
   }
 
   private final void balance(tree_node * current) {
-    takeRight = (current.C[2].numDesc > current.C[0].numDesc);
-    tree_node * swap1, swap2;
-    targetNode = current;
-    while(unbalanced(current)) {
-      swap = detach();
-      swap(&*current, &*swap);
-      if(takeRight) {
-        swap2 = getNext(current, 2);
-        swap2.C[2] = swap;
-      } else {
-        swap2 = getNext(current, 0);
-        swap2.C[1] = swap;
-      } swap.C[1] = swap2;
-      descMod(swap2);
-    }
-
+    if(current is null) { return; }
+    determineUnbalancedSide(&*current);
+    int redistribute = current.numDesc / 2;
+    for(int i = 0; i < redistribute; i++) {
+      tree_node * change = detatch(&*current);
+      descMod(&*change, -1);
+      swap(&*change, &*current);
+      current.numDesc = change.numDesc;
+      size--;
+      insert(change.payload);
+      //sendToStack(&*change);
+    } rotateLeft = false;
+    balance(current.C[0]);
+    balance(current.C[2]);
   }
 
+  private final void traverse(tree_node * current) {
+    if(current is null) { return; }
+    traverse(current.C[0]); 
+    contour(current.numDesc);
+    write(current.payload);
+    if(current == root) { write(" root"); }
+    write(", nodes in tree: ");
+    writeln(current.numDesc);
+    traverse(current.C[2]);
+  }
+
+  private final void contour(int levels) {
+    for(int i = 0; i < levels; i++) {
+      write("-");
+    }
+  }
 }
 
 
@@ -178,17 +229,28 @@ unittest {
   tree.insert(3);
   assert(tree.getSize() == 1);
   assert(tree.search(3));
+  tree.insert(4);
+  tree.insert(5);
+  tree.insert(6);
+  tree.insert(7);
+  tree.insert(8);
+  tree.insert(9);
+  tree.printOut();
+  tree.rebalance();
+  tree.printOut();  
 }
 
 unittest {
   auto tree = new BST!int;
-  for(int i = 1; i <= 1000; i++) {
+  for(int i = 1; i <= 100; i++) {
     tree.insert(i);
     assert(tree.getSize() == i);
     tree.insert(i);
     assert(tree.getSize() == i);
     assert(tree.search(i));
-  }
+  } tree.insert(101);
+  tree.rebalance();
+  tree.printOut();  
 }
 
 unittest {
@@ -197,7 +259,7 @@ unittest {
     tree.insert(i);
     assert(tree.getSize() == 1000 - i + 1);
     assert(tree.search(i));
-  }
+  } tree.rebalance();
 }
 
 unittest {
@@ -288,7 +350,7 @@ unittest {
     assert(tree.getSize() == 0);
   }
 }
-
+/*
 unittest {
   class thingy {}
   import Stack: Stack;
@@ -301,7 +363,9 @@ unittest {
     tree.insert(thing);
     assert(tree.search(thing));
   }
-  //tree.balance();
+  writeln("Rebalancing 1");
+  tree.rebalance();
+  writeln("Balanced. 1");
   for(int i = 0; i < 10000; i++) {
     auto thing = stack.pop();
     tree.remove(thing);
@@ -309,7 +373,7 @@ unittest {
   }
   assert(tree.getSize() == 0);
 }
-/*
+
 unittest {
   import std.random;
   import Stack: Stack;
@@ -317,13 +381,15 @@ unittest {
   auto tree = new BST!int;
   auto stk = new Stack!int;
   int rand = 0;
-  for(int j = 0; j < 1000000; j++) {
+  for(int j = 0; j < 100000; j++) {
     rand = uniform(-1000000, 1000000);
     stk.push(rand);
     tree.insert(rand);
     assert(tree.searchTree(rand));
   }
-  tree.balance();
+  writeln("Rebalancing 2");
+  tree.rebalance();
+  writeln("Balanced. 2");
   while(stk.length() > 0) {
     assert(tree.searchTree(stk.pop()));
   }
