@@ -6,8 +6,8 @@ import std.math: abs;
 
 class BST(T) {
 
-  private int size = 0;
-  private int stackSize = 0;
+  private ulong size = 0;
+  private uint stackSize = 0;
   private tree_node * root = null;
   private tree_node * targetNode = null;
   //private tree_node * stackRoot = null;
@@ -15,12 +15,12 @@ class BST(T) {
 
   private struct tree_node {
     T payload;
-    real val = 0.0;
+    long val = 0;
     tree_node*[3] C;
-    int numDesc = 0;
+    long numDesc = 0;
   }
 
-  public final int getSize() {
+  public final ulong getSize() {
     return size;
   }
 
@@ -70,7 +70,7 @@ class BST(T) {
     //sendToStack(toStack);
   }
 
-  private final bool searchTree(real val) {
+  private final bool searchTree(long val) {
     if(root is null) { return false; }
     tree_node * current = root;
     while(current !is null) {
@@ -80,7 +80,7 @@ class BST(T) {
     } return false;
   }
 
-  private final int comp(real cur, real input) {
+  private final int comp(long cur, long input) {
     if(cur > input) { return 0; }
     return 2;
   }
@@ -114,8 +114,8 @@ class BST(T) {
   private final void swap(
       tree_node * current, tree_node * other) {
     T temp = other.payload;
-    real tempVal = other.val;
-    int tempDesc = other.numDesc;
+    long tempVal = other.val;
+    long tempDesc = other.numDesc;
     other.val = current.val;
     other.payload = current.payload;
     other.numDesc = current.numDesc;
@@ -124,11 +124,11 @@ class BST(T) {
     current.numDesc = tempDesc;
   }
 
-  private final real cmp(T item) {
+  private final long cmp(T item) {
     static if (is(T == class)) {
-      return cast(real) (cast(void*) item);
+      return cast(long) (cast(void*) item);
     } else {
-      return cast(real) item;
+      return cast(long) item;
     }
   }
 
@@ -145,7 +145,7 @@ class BST(T) {
   }
 
   private final void descMod(
-      tree_node * current, int modNum) {
+      tree_node * current, long modNum) {
     while(current !is root) {    
       current.numDesc += modNum;
       current = current.C[1];
@@ -174,7 +174,7 @@ class BST(T) {
   private final void findUnbalanced(tree_node * current) {
     if(current is null) {
       return;
-    } else if(unbalanced(&*current)) {
+    } else if(unbalanced(&*current)) {// put if in here for size boundaries. Small trees use custom expression. Mid - large: balance(), larger: moveTrees()
       balance(&*current);
       return;
     } findUnbalanced(current.C[0]);
@@ -184,8 +184,8 @@ class BST(T) {
   private final void balance(tree_node * current) {
     if(current is null) { return; }
     determineUnbalancedSide(&*current);
-    int redistribute = current.numDesc / 2;
-    for(int i = 0; i < redistribute; i++) {
+    long redistribute = getAmount(&*current);// current.numDesc / 2;
+    for(long i = 0; i < redistribute; i++) {
       tree_node * change = detatch(&*current);
       descMod(&*change, -1);
       swap(&*change, &*current);
@@ -196,6 +196,18 @@ class BST(T) {
     } rotateLeft = false;
     balance(current.C[0]);
     balance(current.C[2]);
+  }
+
+  private final long getAmount(tree_node * current) {
+    if(current.C[0] is null && current.C[2] is null) {
+      return 0;
+    } else if(current.C[0] is null) {
+      return current.C[2].numDesc / 2;
+    } else if(current.C[2] is null) {
+      return current.C[0].numDesc / 2;
+    } else {
+      return abs(current.C[0].numDesc - current.C[2].numDesc) / 2;
+    }
   }
 
   private final void traverse(tree_node * current) {
@@ -209,14 +221,34 @@ class BST(T) {
     traverse(current.C[2]);
   }
 
-  private final void contour(int levels) {
-    for(int i = 0; i < levels; i++) {
+  private final void contour(long levels) {
+    for(long i = 1; i < levels; i++) {
       write("-");
     }
   }
 }
 
 
+unittest {
+  auto tree = new BST!int;
+  tree.insert(1);
+  tree.insert(2);
+  tree.insert(3);
+  tree.insert(4);
+  tree.printOut();
+  tree.rebalance();
+  tree.printOut();
+  tree.insert(5);
+  tree.insert(6);
+  tree.rebalance();
+  tree.printOut();
+  tree.insert(7);
+  tree.insert(8);
+  tree.insert(9);
+  tree.insert(10);
+  tree.rebalance();
+  tree.printOut();
+}
 
 
 unittest {
@@ -230,9 +262,8 @@ unittest {
   tree.insert(7);
   tree.insert(8);
   tree.insert(9);
-  tree.printOut();
   tree.rebalance();
-  tree.printOut();  
+  assert(tree.getSize() == 7);
 }
 
 unittest {
@@ -243,8 +274,9 @@ unittest {
     tree.insert(i);
     assert(tree.getSize() == i);
     assert(tree.search(i));
+    tree.rebalance();
   } tree.insert(101);
-  tree.rebalance();
+  
   tree.printOut();  
 }
 
@@ -287,7 +319,7 @@ unittest {
   for(int i = 10000; i >= 0; i--) {
     tree.insert(i);
     assert(tree.search(i));
-  } int newsize;
+  } long newsize;
   for(int i = 10000; i >= 0; i--) {
     newsize = tree.getSize();
     tree.remove(i);
@@ -333,7 +365,7 @@ unittest {
       tree.insert(rand);
       assert(tree.search(rand));
     }
-    int newsize;
+    long newsize;
     for(int k = -10001; k <= 10001; k++) {
       newsize = tree.getSize();
       if(tree.search(k)) {
@@ -376,7 +408,7 @@ unittest {
   auto tree = new BST!int;
   auto stk = new Stack!int;
   int rand = 0;
-  for(int j = 0; j < 100000; j++) {
+  for(int j = 0; j < 20000; j++) {
     rand = uniform(-1000000, 1000000);
     stk.push(rand);
     tree.insert(rand);
@@ -389,3 +421,4 @@ unittest {
     assert(tree.searchTree(stk.pop()));
   }
 }
+
