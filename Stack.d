@@ -1,45 +1,62 @@
+module Stack;
 class Stack(T) {
-  import core.stdc.stdlib: exit;
-  import std.stdio: writeln;
+  import commonTypes;
+
   private:
-
-  struct stk_node {
-    T item;
-    stk_node * next;
-  }
-  stk_node * root;
-  int len = 0;
-
+    node!T* root;
   public:
 
-  final void push(T item) {
-    if(len == 0) {
-      root = new stk_node(item,null);
-    } else {
-      stk_node * newNode = new stk_node(item, null);
-      newNode.next = *&root;
-      root = newNode;
-    } len++;
+  final void pushItem(T item) {
+    push(new node!T(item));
   }
 
-  final T pop() {
-    if(len == 0) {
-      writeln("ERROR: Empty Stack.");
-      exit(0);
+  final void push(node!T* temp) {
+    if(root is null) {
+      root = temp;
+      root.size = 1;
+    } else {
+      temp.nodes[2] = root;
+      temp.size = root.size + 1;
+      root = temp;
     }
-    T value;
-    value = root.item;
-    root = root.next;
-    len--;
+  }
+
+  final T popItem() {
+    if(root is null) {
+      return cast(T) null;
+    }
+    node!T* temp;
+    T value = root.payload;
+    temp = root;
+    root = root.nodes[2];
     return value;
+  }
+
+  final node!T* pop() {
+    if(root is null) {
+      return null;
+    }
+    node!T* temp;
+    temp = root;
+    root = root.nodes[2];
+    return temp;
   }
 
   final void clear() {
     root = null;
-    len = 0;
   }
 
-  final T peek() { return root.item; }
+  final T peek() {
+    return root.payload;
+  }
 
-  final int length() { return len; }
+  final long length() {
+    if(root is null) {
+      return 0;
+    } return root.size;
+  }
+
+  final bool isEmpty() {
+    return root is null;
+  }
 }

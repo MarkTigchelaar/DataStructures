@@ -1,48 +1,65 @@
+module Queue;
 class Queue(T) {
-  import core.stdc.stdlib: exit;
-  import std.stdio: writeln;
+  import commonTypes;
   private:
-
-  struct qnode {
-    T item;
-    qnode * next;
-  }
-  qnode * front;
-  qnode * rear;
-
-  int len;
+  	node!T* front;
+  	node!T* rear;
+  	long len;
 
   public:
 
-  final void enqueue(T item) {
-    if(len == 0) {
-      front = new qnode(item, null);
+  final void enqueue(node!T* temp) {
+    if(front is null) {
+      front = temp;
       rear = front;
     } else {
-      qnode * newqnode = new qnode(item, null);
-      rear.next = *&newqnode;
-      rear = newqnode;
+      rear.nodes[2] = temp;
+      rear = temp;
     } len++;
   }
 
-  final T dequeue() {
-    if(len == 0) {
-      writeln("ERROR: Empty Queue.");
-      exit(0);
+  final void enqueueItem(T item) {
+  	enqueue(new node!T(item));
+  }
+
+  final T dequeueItem() {
+    if(front is null) {
+      return cast(T) null;
     }
-    T value;
-    value = front.item;
-    front = front.next;
+    T value = front.payload;
+    front = front.nodes[2];
     len--;
     return value;
   }
 
-  final T peek() { return front.item; }
+  final node!T* dequeue() {
+  	if(front is null) {
+  	  return null;
+  	}
+  	node!T* temp = front;
+  	front = front.nodes[2];
+  	temp.nodes[2] = null;
+  	len--;
+  	return temp;
+  }
+
+  final T peek() {
+  	if(front is null) {
+  	  return cast(T) null;
+  	} return front.payload;
+  }
 
   final void clear() {
     front = null;
     rear = null;
     len = 0;
   }
-  final int length() { return len; }
+
+  final int length() {
+  	return len;
+  }
+
+  final bool isEmpty() {
+  	return len == 0;
+  }
 }
