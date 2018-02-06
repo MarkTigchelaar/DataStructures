@@ -347,13 +347,17 @@ class BinarySearchTree(T) {
       head = treeNode;
       head.size = 1;
     } else {
-      treeNode.nodes[left] = head;
-      treeNode.size = head.size + 1;
-      head.nodes[up] = treeNode;
-      head = treeNode;
+      insertAtFront(treeNode);
     }
 
     listify(RHS);
+  }
+
+  private void insertAtFront(node!T* treeNode) {
+  	treeNode.nodes[left] = head;
+    treeNode.size = head.size + 1;
+    head.nodes[up] = treeNode;
+    head = treeNode;
   }
 
   private node!T* rebuildTree(node!T* treeNode,int nodesIdx) {
