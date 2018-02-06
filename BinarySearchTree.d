@@ -63,14 +63,14 @@ class BinarySearchTree(T) {
   public bool isItemInTree(T item) {
     node!T* current = root;
     node!T* temp = New(item);
-    int idx;
+    int index;
     while(current !is null) {
       if(current.val == temp.val) {
         returnToStack(temp);
         return true;
       }
-      idx = direction(current, temp);
-      current = nextNode(current, idx);
+      index = direction(current, temp);
+      current = nextNode(current, index);
     }
     returnToStack(temp);
     return false;
@@ -79,7 +79,7 @@ class BinarySearchTree(T) {
   public void balance() {
     listify(root);
     root = null;
-    root = rebuild(head,right);
+    root = rebuildTree(head,right);
     head = null;
   }
 
@@ -102,18 +102,18 @@ class BinarySearchTree(T) {
     return retVal;
   }
 
-  private void returnToStack(node!T* nde) {
-    if(nde is null) { return; }
-    clearNode(nde);
-    nde.payload = cast(T) null;
-    stack.push(nde);
+  private void returnToStack(node!T* treeNode) {
+    if(treeNode is null) { return; }
+    clearNode(treeNode);
+    treeNode.payload = cast(T) null;
+    stack.push(treeNode);
   }
 
-  private void clearNode(node!T* nde) {
-    nde.nodes[left] = null;
-    nde.nodes[right] = null;
-    nde.nodes[up] = null;
-    nde.size = 0;
+  private void clearNode(node!T* treeNode) {
+    treeNode.nodes[left] = null;
+    treeNode.nodes[right] = null;
+    treeNode.nodes[up] = null;
+    treeNode.size = 0;
   }
 
   private final long cmpVal(T item) {
@@ -126,52 +126,57 @@ class BinarySearchTree(T) {
     }
   }
 
-  private bool add(node!T* nde) {
+  private bool add(node!T* treeNode) {
     if(root is null) {
-      root = nde;
+      root = treeNode;
       root.size = 1;
       return false;
     }
-
-    int idx;
+    int index;
     node!T* current = root;
     bool balance = false;
     while(current !is null) {
-      idx = direction(current, nde);
-      if(!balance && unbalanced(current)) {
-        balance = true;
+      index = direction(current, treeNode);
+      setForBalance(current, &balance);
+      if(spotFound(current,treeNode,index)) {
+      	break;
+      } current = nextNode(current, index);  
+    } return balance;
+  }
+
+  private void setForBalance(node!T* current,bool* balance) {
+  	if(!*balance && unbalanced(current)) {
+        *balance = true;
         head = current;
-      }
-      if(current.val == nde.val) {
-        returnToStack(nde);
-        break;
-      } else if(nextIsNull(current,idx)) {
-        attachChild(current,nde,idx);
-        modifysize(nde,1);
-        break;
-      } else {
-        current = nextNode(current, idx);
-      }
     }
-    return balance;
+  }
+
+  private bool spotFound(
+  	    node!T* current,
+  	    node!T* treeNode,
+  	    int index
+  	) {
+    if(current.val == treeNode.val) {
+      returnToStack(treeNode);
+      return true;
+    } if(nextIsNull(current,index)) {
+      attachChildToParent(current,treeNode,index);
+      modifySize(treeNode,1);
+      return true;
+    } return false;
   }
 
   private node!T* takeNode(node!T* comp, bool* balance) {
     node!T* current = root;
-    int idx;
+    int index;
     while(current !is null) {
-      idx = direction(current, comp);
+      index = direction(current, comp);
+      setForBalance(current, balance);
       if(current.val == comp.val) {
         returnToStack(comp);
         return removeNode(current);
-      } else if(!*balance && unbalanced(current)) {
-        *balance = true;
-        head = current;
-      } else {
-        current = nextNode(current, idx);
-      }
-    }
-    returnToStack(comp);
+      } current = nextNode(current, index);
+    } returnToStack(comp);
     return null;
   }
 
@@ -179,7 +184,7 @@ class BinarySearchTree(T) {
     if(current is root) {
       return removeRoot(current);
     } else if(isLeaf(current)) {
-      modifysize(current, -1);
+      modifySize(current, -1);
       return takeLeaf(current);
     } else if(inList(current)) {
       return takeFromList(current);
@@ -196,8 +201,8 @@ class BinarySearchTree(T) {
     } return takeSubTreeNode(treeRoot);
   }
 
-  private int nonNullDirection(node!T* nde) {
-    return cast(int) nextIsNull(nde, left);
+  private int nonNullDirection(node!T* treeNode) {
+    return cast(int) nextIsNull(treeNode, left);
   }
 
   private bool isLeaf(node!T* current) {
@@ -227,7 +232,7 @@ class BinarySearchTree(T) {
     parentNode.nodes[dir] = current.nodes[nonNullDir];
     parentNode.nodes[dir].nodes[up] = parentNode;
 
-    modifysize(current, -1);
+    modifySize(current, -1);
 
     current.nodes[up] = null;
     current.nodes[dir] = null;
@@ -236,21 +241,19 @@ class BinarySearchTree(T) {
 
   private node!T* takeSubTreeNode(node!T* current) {
     node!T* leaf;
-    if(!nextIsNull(current,right)) {
-      leaf = takeLowestNode(nextNode(current,right), left);
-    } else {
-      leaf = takeLowestNode(nextNode(current,left), right);
-    } swapValues(current, leaf);
+    int dir = cast(int) nextIsNull(current,right);
+    leaf = takeLowestNode(nextNode(current,1 - dir), dir);
+    swapValues(current, leaf);
     return leaf;
   }
 
-  private node!T* takeLowestNode(node!T* nde, int dir) {
-    while(!nextIsNull(nde,dir)) {
-      nde = nextNode(nde, dir);
-    } if(isLeaf(nde)) {
-      modifysize(nde, -1);
-      return takeLeaf(nde);
-    } return takeFromList(nde);
+  private node!T* takeLowestNode(node!T* treeNode, int dir) {
+    while(!nextIsNull(treeNode,dir)) {
+      treeNode = nextNode(treeNode, dir);
+    } if(isLeaf(treeNode)) {
+      modifySize(treeNode, -1);
+      return takeLeaf(treeNode);
+    } return takeFromList(treeNode);
   }
 
   private void swapValues(node!T* current,node!T* leaf) {
@@ -263,133 +266,138 @@ class BinarySearchTree(T) {
     current.payload = temp;
   }
 
-  private void attachChild(node!T* current,node!T* nde, int idx) {
-    current.nodes[idx] = nde;
-    if(current.nodes[idx] !is null) {
-      current.nodes[idx].nodes[up] = current;
+  private void attachChildToParent(
+  	  node!T* current,
+  	  node!T* treeNode,
+  	  int index
+  	  ) {
+    current.nodes[index] = treeNode;
+    if(current.nodes[index] !is null) {
+      current.nodes[index].nodes[up] = current;
     }
   }
 
-  private node!T* nextNode(node!T* nde, int idx) {
-    return nde.nodes[idx];
+  private node!T* nextNode(node!T* treeNode, int index) {
+    return treeNode.nodes[index];
   }
 
   private bool nextIsNull(node!T* current, long val) {
     return current.nodes[val] is null;
   }
 
-  private int direction(node!T* current,node!T* nde) {
-    return cast(int) (current.val < nde.val);
+  private int direction(node!T* current,node!T* treeNode) {
+    return cast(int) (current.val < treeNode.val);
   }
 
-  private void modifysize(node!T* nde, int addOrSub) {
-    while(nde !is root) {
-      nde.size += addOrSub;
-      nde = parent(nde);
+  private void modifySize(node!T* treeNode, int addOrSub) {
+    while(treeNode !is root) {
+      treeNode.size += addOrSub;
+      treeNode = parent(treeNode);
     } root.size += addOrSub;
   }
 
-  private node!T* parent(node!T* nde) {
-    return nde.nodes[up];
+  private node!T* parent(node!T* treeNode) {
+    return treeNode.nodes[up];
   }
 
-  private bool unbalanced(node!T* nde) {
-    if(nde.size < 3) { return false; }
+  private bool unbalanced(node!T* treeNode) {
+    if(treeNode.size < 3) { return false; }
 
-    if(nextIsNull(nde,left) ||
-      nextIsNull(nde,right)) {
+    if(nextIsNull(treeNode,left) ||
+      nextIsNull(treeNode,right)) {
       return true;
     }
-    long leftSize = nde.nodes[left].size;
-    long rightSize = nde.nodes[right].size;
-    return leftSize > 2*rightSize || rightSize > 2*leftSize;
+    long leftSize = treeNode.nodes[left].size;
+    long rightSize = treeNode.nodes[right].size;
+    return leftSize > 2*rightSize ||
+           rightSize > 2*leftSize;
   }
 
-  private void balanceTree(node!T* nde) {
-    if(nde is root) {
+  private void balanceTree(node!T* treeNode) {
+    if(treeNode is root) {
       head = null;
       balance();
       return;
     }
-    node!T* parent = parent(nde);
-    int idx = direction(parent, nde);
-    detachParentAndChild(parent, idx);
+    node!T* parent = parent(treeNode);
+    int index = direction(parent, treeNode);
+    detachParentFromChild(parent, index);
     head = null;
-    listify(nde);
-    attachChild(parent, rebuild(head,right), idx);
+    listify(treeNode);
+    attachChildToParent(parent, rebuildTree(head,right), index);
   }
 
-  private void detachParentAndChild(node!T* nde, int direction) {
-    if(nde.nodes[direction] !is null) {
-      nde.nodes[direction].nodes[up] = null;
-    } nde.nodes[direction] = null;
+  private void detachParentFromChild(
+  	    node!T* treeNode, int direction) {
+    if(treeNode.nodes[direction] !is null) {
+      treeNode.nodes[direction].nodes[up] = null;
+    } treeNode.nodes[direction] = null;
   }
 
-  private void listify(node!T* nde) {
-    if(nde is null) { return; }
+  private void listify(node!T* treeNode) {
+    if(treeNode is null) { return; }
 
-    node!T* LHS = nde.nodes[left];
-    node!T* RHS = nde.nodes[right];
-    clearNode(nde);
+    node!T* LHS = treeNode.nodes[left];
+    node!T* RHS = treeNode.nodes[right];
+    clearNode(treeNode);
 
     listify(LHS);
 
     if(head is null) {
-      head = nde;
+      head = treeNode;
       head.size = 1;
     } else {
-      nde.nodes[left] = head;
-      nde.size = head.size + 1;
-      head.nodes[up] = nde;
-      head = nde;
+      treeNode.nodes[left] = head;
+      treeNode.size = head.size + 1;
+      head.nodes[up] = treeNode;
+      head = treeNode;
     }
 
     listify(RHS);
   }
 
-  private node!T* rebuild(node!T* nde,int nodesIdx) {
-    if(nde is null) { return null; }
-    long half = nde.size /2;
-    int reverse = 1-nodesIdx;
+  private node!T* rebuildTree(node!T* treeNode,int nodesIdx) {
+    if(treeNode is null) { return null; }
+    long half = treeNode.size /2;
+    
     for(int i; i < half; i++) {
-      nde = rotate(nde,nodesIdx);
+      treeNode = rotateList(treeNode,nodesIdx);
     }
-    node!T* temp = nde.nodes[reverse];
-    detachParentAndChild(nde,reverse);
-
-    attachChild(nde, rebuild(temp, nodesIdx), reverse);
-
-    temp = nde.nodes[nodesIdx];
-    detachParentAndChild(nde,nodesIdx);
-
-    attachChild(nde, rebuild(temp, reverse), nodesIdx); 
-    return nde;
+	moveSubTreeRoot(treeNode, nodesIdx);
+	moveSubTreeRoot(treeNode, 1 - nodesIdx);
+    return treeNode;
   }
 
-  private node!T* rotate(node!T* nde,int idx) {
-    int addTo = 1;
-    if(! nextIsNull(nde, idx)) {
-      addTo += nde.nodes[idx].size;
-    }
-    node!T* temp = nextNode(nde,1-idx);
+  private void moveSubTreeRoot(node!T* treeNode, int direction) {
+    node!T* temp = treeNode.nodes[1-direction];
+    detachParentFromChild(treeNode,1-direction);
+    attachChildToParent(treeNode, rebuildTree(temp, direction), 1-direction);
+  }
 
-    promoteChild(temp, idx);
+  private node!T* rotateList(node!T* listNode,int index) {
+    int addTo = 1;
+    if(! nextIsNull(listNode, index)) {
+      addTo += listNode.nodes[index].size;
+    }
+    node!T* temp = nextNode(listNode,1-index);
+
+    promoteChild(temp, index);
     temp.size += addTo;
 
-    demoteParent(nde,1-idx);
-    nde.size = addTo;
+    demoteParent(listNode,1-index);
+    listNode.size = addTo;
 
     return temp;
   }
 
-  private void promoteChild(node!T* temp,int idx) {
-    temp.nodes[idx] = temp.nodes[up];
-    temp.nodes[up] = null;
+  private void promoteChild(node!T* listNode,int index) {
+    listNode.nodes[index] = listNode.nodes[up];
+    listNode.nodes[up] = null;
   }
 
-  private void demoteParent(node!T* nde,int idx) {
-    nde.nodes[up] = nde.nodes[idx];
-    nde.nodes[idx] = null;
+  private void demoteParent(node!T* listNode,int index) {
+    listNode.nodes[up] = listNode.nodes[index];
+    listNode.nodes[index] = null;
   }
 
   public void printOut() {
@@ -427,16 +435,16 @@ class BinarySearchTree(T) {
     return counter(root, 0);
   }
 
-  private int counter(node!T* nde, int target) {
+  private int counter(node!T* treeNode, int target) {
     import std.stdio: writeln;
-    if(nde is null) { return 0; }
-    target += counter(nde.nodes[left], 0);
-    target += counter(nde.nodes[right], 0);
+    if(treeNode is null) { return 0; }
+    target += counter(treeNode.nodes[left], 0);
+    target += counter(treeNode.nodes[right], 0);
 
     target++;
-    if(target != nde.size) {
+    if(target != treeNode.size) {
       writeln("ERROR: treeCount inaccurate, 
-      reported ", nde.size, " but is ", target);
+      reported ", treeNode.size, " but is ", target);
       return 0;
     }
     return target;
@@ -565,6 +573,7 @@ unittest {
     keys ~= cast(long) (cast(void*) t);
     Tree.insert(t);
     assert(Tree.isItemInTree(t));
+    assert(cast(int) Tree.getSize() == Tree.testSize());
   }
   writeln(Tree.getSize());
   tests = Tree.popItemsByKeys(keys);
@@ -577,7 +586,7 @@ unittest {
 
 unittest {
   import std.stdio: writeln;
-  import nodes: NetworkNode;
+  import commonTypes: NetworkNode;
   class Test: NetworkNode {
     private char ch;
     private NetworkNode[] Observers;

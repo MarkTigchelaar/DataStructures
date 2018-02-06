@@ -15,7 +15,6 @@ interface NetworkNode {
 }
 
 interface DataStructure {
-	node!T pop();
 	void push();
 	bool isEmpty();
 	long length();
